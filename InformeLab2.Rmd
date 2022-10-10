@@ -1,0 +1,788 @@
+---
+title: "ReporteLab2"
+output: html_document
+date: '2022-08-02'
+authors: "Daniela Batz | Alfredo Quezada"
+---
+
+```{r setup, include=FALSE}
+
+library("readxl")
+library(ggplot2)
+
+data_impor <- read_excel("Importacion.xlsx")
+data_consumo <- read_excel("Consumo.xlsx")
+
+# Mes con el cual se tiene mayor importacion de Gasolina
+gas<-data_impor[order(-data_impor$Superior),]
+super<- head(gas,10)
+super<-super[,1:2]
+
+
+
+#Mes en el cual se tiene mayor importacion de Regular 
+reg<-data_impor[order(-data_impor$Regular),]
+regu<- head(reg,10)
+regu<-regu[,1:2]
+
+
+#Mes en el que se tiene mayor importacion de Disel 
+diesel<-data_impor[order(-data_impor$Diesel),]
+dies<- head(diesel, 10)
+dies<-dies[,1:2]
+
+# Mes con el cual se tiene menor importacion de Gasolina
+gas1<-data_impor[order(data_impor$Superior),]
+menossuper<- head(gas1,10)
+menossuper<-menossuper[,1:2]
+
+
+
+#Mes en el cual se tiene menor importacion de Regular 
+reg1<-data_impor[order(data_impor$Regular),]
+menosregu<- head(reg1,10)
+menosregu<-menosregu[,1:2]
+
+
+#Mes en el que se tiene menor importacion de Disel 
+diesel1<-data_impor[order(data_impor$Diesel),]
+menosdies<- head(diesel1, 10)
+menosdies<-menosdies[,1:2]
+
+
+
+
+def<-data.frame(Tipo=c("Gasolina","Regular","Diesel"), Media=c(mean(data_impor$Superior), mean(data_impor$Regular), mean(data_impor$Diesel)))
+
+grafdef<-ggplot(data=def, aes(x=Tipo, y=Media, fill=Tipo)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_text(aes(label=as.integer(Media)), vjust=1.6, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  labs(title="Promedio de importaciones por tipo de gasolina", y="Promedio")+
+  theme(legend.position="none")
+
+
+grafsup<-ggplot(data_impor, aes(x = format(`Fecha`, format='%Y'), y = `Superior`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Importaciones por año de combustible Superior", y="Importacion" , x='Año')+
+  theme(legend.position="none")
+
+
+grafreg<-ggplot(data_impor, aes(x = format(`Fecha`, format='%Y'), y = `Regular`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Importaciones por año de combustible Regular", y="Importacion" , x='Año')+
+  theme(legend.position="none")
+
+
+grafdie<-ggplot(data_impor, aes(x = format(`Fecha`, format='%Y'), y = `Diesel`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Importaciones por año de combustible Diesel", y="Importacion" , x='Año')+
+  theme(legend.position="none")
+
+
+
+
+```
+
+## Analisis exploratorio de Importaciones 
+
+Para las importaciones se tienen los siguientes datos:
+
+```{r }
+data_impor
+```
+
+de los mismos se pueden obtener lo siguente: 
+
+```{r}
+hist(x = data_impor$Superior)
+```
+
+
+
+```{r}
+hist(x = data_impor$Regular)
+```
+
+
+
+```{r}
+hist(x = data_impor$Diesel)
+```
+
+
+
+```{r}
+plot(data_impor$Fecha, data_impor$Total_Importación)
+```
+
+
+Ahora, explorando aun mas los datos, podemos ver cuales han sido las fechas en las que se encuentra una mayor importacion por cada uno de los tipos de combustible. 
+
+Para el combustible superior: 
+
+```{r}
+super
+```
+
+Para el combustible regular: 
+
+```{r}
+regu
+```
+
+Para el combustible diesel: 
+```{r}
+dies
+```
+
+
+Asi mismo podemos ver cuales fueron las fechas en las que se observa una cantidad menor de importacion de cada uno de los tipos de combustible.
+
+```{r}
+menossuper
+```
+
+Para el combustible regular: 
+
+```{r}
+menosregu
+```
+
+Para el combustible diesel: 
+```{r}
+menosdies
+```
+
+
+Graficas:
+
+```{r}
+grafdef
+```
+
+
+Como se observa en la grafica se puede ver que la gasolina Diesel ha sido la que mayor importaciones ha tenido en promedio, lo cual es de cierta forma algo logico, debido a que este combustible juega un papel importante en el transporte publico y pesado, sin tomar en cuenta la gran cantidad de vehiculos y maquinas que se manejan con ese combustible. 
+
+
+```{r}
+grafsup
+```
+
+
+Y basados en la grafica anterior, podemos ver que el año 2021 fue el año con que el combustible super cuenta con mayor cantidad de importacion reportada. 
+
+
+```{r}
+grafreg
+```
+
+
+Como podemos ver, el año 2022 es el cual se lleva reportado una mayor cantidad de combustible Regular, lo cual de cierta forma podemos decir que es equivalente a lo que se vio, debido al alza de los precios, el combustible Superior presentaba un valor mas caro que el Regular, por lo que la poblacion empezo a optar por esa opcion.
+
+
+```{r}
+grafdie
+```
+
+
+El 2018 fue el año que mayor cantidad de importaciones se han registrado. 
+
+
+
+## Series de las importaciones
+
+```{r include=FALSE}
+library(forecast)
+library(tseries)
+library(fUnitRoots)
+library(ggfortify)
+library("readxl")
+
+impor <- read_excel("Importacion.xlsx")
+
+super<-impor[c('Fecha','Superior')]
+regular<-impor[c('Fecha','Regular')]
+diesel<-impor[c('Fecha','Diesel')]
+
+```
+
+Empezaremos con la serie del combustible Superior, como queremos hacer un modelo ARIMA dividiremos este proceso en cuatro pasos, los cuales seran iguales para todos los combustibles. 
+
+## Combustible SUPERIOR:
+ 
+Primer paso, identificacion:
+
+```{r}
+# Para el combustible Superior 
+super_ts <- ts( super$`Superior`, start = c(2001,1),frequency = 12)
+
+# Inicio de la serie
+start(super_ts)
+#Final de la serie
+end(super_ts)
+#Frecuencia de la serie 
+frequency(super_ts)
+
+#Resultado en forma de grafica. 
+plot(super_ts)
+abline(reg=lm(super_ts~time(super_ts)), col=c("blue"))
+
+```
+
+
+Con esto, podemos ver el compartamiento que ha tenido el combustible superior a lo largo de los años. 
+
+
+```{r}
+plot(aggregate(super_ts,FUN=mean))
+dec.Super<-decompose(super_ts)
+plot(dec.Super)
+```
+
+
+Como se observa en la grafica anterior, la serie tiene tendencia a aumentar asi como que tambien tiene estacionalidad y por ultimo, se puede ver que no es estacionaria en varianza, por eso debemos aplicarle una transformacion logaritmica. 
+
+
+```{r}
+train <- head(super_ts, round(length(super_ts) * 0.7))
+h <- length(super_ts) - length(train)
+test <- tail(super_ts, h)
+#Aplicaremos una transformación logarítmica
+Superlog <- log(train)
+plot(decompose(train))
+```
+
+
+```{r}
+#Ver el gráfico de la serie
+plot(train)
+```
+
+Se observa con esta transformacion, se logro hacer constante en varianza, ahora podemos enfocarnos en su estacionalidad en la media, para eso haremos la prueba de raices...
+
+
+
+```{r}
+adfTest(train)
+unitrootTest(train)
+```
+
+
+El valor de P es mayor a 0.05, por lo que ahora veremos que pasa si le aplicamos una diferenciacion
+
+```{r}
+adfTest(diff(train))
+unitrootTest(diff(train))
+```
+
+
+Con el nuevo valor de P, que es menor a 0.5, podemos asumir que tenemos un valor D=1, por lo que ahora identificaremos el valor P y Q
+
+
+```{r}
+acf(Superlog, 50)
+```
+
+
+Basandonos en la grafica, podemos asumir que el valor de Q sera igua la 1, ahora trataremos de identificar el valor de P.
+
+```{r}
+pacf(Superlog, 50)
+```
+
+Igualmente, tomando en cuenta lo visto en la grafica, podemos pensar que el valor de P es igual a 1, es decir, trabajaremos con un modelo ARIMA de la siguiente manera: 
+
+P = 1
+Q = 1
+D = 1 
+
+
+Reiteraremos la prueba de estacionalidad en la serie
+
+```{r}
+traines <- decompose(train)
+plot(traines$seasonal)
+```
+
+
+Si contiene estacionalidad, le aplicaremos 36 resagos para identificar los picos
+
+
+```{R}
+Acf(diff(Superlog),36)
+Pacf(diff(Superlog),36)
+```
+
+
+
+Se puede notar un pico muy notable en 12, por lo cual, haremos que los parametros estacionales sean de la forma (1,1,0), por cual, el ARIMA es:
+```{r}
+fitArima<-arima(Superlog, order = c(1,2,2), seasonal =c(1,1,0))
+fautoarima<-auto.arima(train)
+fautoarima
+```
+
+Para comprobar, haremos la validacion 
+
+```{r warning=FALSE}
+library(lmtest)
+coeftest(fitArima)
+```
+
+
+Ahora haremos el modelo generado por R, para comprobar los dos modelos. 
+
+```{r}
+coeftest(fautoarima)
+```
+
+
+
+
+## Prediccion 
+
+```{r}
+
+auto.arima(super_ts)
+
+
+fit <- arima(log(super_ts), c(0, 1, 1),seasonal = list(order = c(0, 1, 1), period = 12))
+pred <- predict(fit, n.ahead = 3)
+ts.plot(super_ts,2.718^pred$pred, log = "y", lty = c(1,3))
+
+
+
+fit2 <- arima(log(super_ts), c(2, 1, 1),seasonal = list(order = c(0, 1, 0), period = 12))
+
+
+
+forecastAP <- forecast(fit2, level = c(95), h = 3)
+autoplot(forecastAP)
+
+```
+
+
+
+Realmente podemos catalogar como buena la predicion, asi como tambien se puede observar que recien pasado el año 2020, por el año 2021, se observa una gran caida en las importaciones de la gasolina superior, esto tiene logica y mucho sentido, ya que si lo recordamos, para las epocas mas fuertes de la pandemia el trafico y todo lo que generara movilidad estuvo detenido, asi como podemos ver tambien, que en estos tiempos, ha estado entre aumento y descenso, esto debido a su inestabilidad en sus precios. 
+
+
+
+## Combustible REGULAR:
+
+```{r}
+# Para el combustible Superior 
+regular_ts <- ts( regular$`Regular`, start = c(2001,1),frequency = 12)
+
+# Inicio de la serie
+start(regular_ts)
+#Final de la serie
+end(regular_ts)
+#Frecuencia de la serie 
+frequency(regular_ts)
+
+#Resultado en forma de grafica. 
+plot(regular_ts)
+abline(reg=lm(regular_ts~time(regular_ts)), col=c("blue"))
+
+```
+
+
+Con esto, podemos ver el compartamiento que ha tenido el combustible regular a lo largo de los años. 
+
+
+```{r}
+plot(aggregate(regular_ts,FUN=mean))
+dec.Regul<-decompose(regular_ts)
+plot(dec.Regul)
+```
+
+
+Como se observa en la grafica anterior, la serie tiene tendencia a aumentar asi como que tambien tiene estacionalidad y por ultimo, se puede ver que no es estacionaria en varianza, por eso debemos aplicarle una transformacion logaritmica. 
+
+
+```{r}
+train <- head(regular_ts, round(length(regular_ts) * 0.7))
+h <- length(regular_ts) - length(train)
+test <- tail(regular_ts, h)
+#Aplicaremos una transformación logarítmica
+Regulog <- log(train)
+plot(decompose(train))
+```
+
+
+```{r}
+#Ver el gráfico de la serie
+plot(train)
+```
+
+Se observa con esta transformacion, se logro hacer constante en varianza, ahora podemos enfocarnos en su estacionalidad en la media, para eso haremos la prueba de raices...
+
+
+
+```{r}
+adfTest(train)
+unitrootTest(train)
+```
+
+
+El valor de P es mayor a 0.05, por lo que ahora veremos que pasa si le aplicamos una diferenciacion
+
+```{r}
+adfTest(diff(train))
+unitrootTest(diff(train))
+```
+
+
+Con el nuevo valor de P, que es menor a 0.5, podemos asumir que tenemos un valor D=1, por lo que ahora identificaremos el valor P y Q
+
+
+```{r}
+acf(Regulog, 50)
+```
+
+
+Basandonos en la grafica, podemos asumir que el valor de Q sera igual a 2, ahora trataremos de identificar el valor de P.
+
+```{r}
+pacf(Regulog, 50)
+```
+
+Igualmente, tomando en cuenta lo visto en la grafica, podemos pensar que el valor de P es igual a 2, es decir, trabajaremos con un modelo ARIMA de la siguiente manera: 
+
+P = 2
+Q = 2
+D = 1 
+
+
+Reiteraremos la prueba de estacionalidad en la serie
+
+```{r}
+traines <- decompose(train)
+plot(traines$seasonal)
+```
+
+
+Si contiene estacionalidad, le aplicaremos 36 resagos para identificar los picos
+
+
+```{R}
+Acf(diff(Regulog),36)
+Pacf(diff(Regulog),36)
+```
+
+
+
+Se puede notar un pico muy notable en 12, por lo cual, haremos que los parametros estacionales sean de la forma (1,1,0), por cual, el ARIMA es:
+```{r}
+fitArima<-arima(Regulog, order = c(2,1,2), seasonal =c(1,1,0))
+fautoarima<-auto.arima(train)
+fautoarima
+```
+
+Para comprobar, haremos la validacion 
+
+```{r warning=FALSE}
+library(lmtest)
+coeftest(fitArima)
+```
+
+
+Ahora haremos el modelo generado por R, para comprobar los dos modelos. 
+
+```{r}
+coeftest(fautoarima)
+```
+
+
+
+
+## Prediccion 
+
+```{r}
+
+auto.arima(regular_ts)
+
+
+fit <- arima(log(regular_ts), c(0, 1, 1),seasonal = list(order = c(0, 1, 1), period = 12))
+pred <- predict(fit, n.ahead = 3)
+ts.plot(regular_ts,2.718^pred$pred, log = "y", lty = c(1,3))
+
+
+
+fit2 <- arima(log(regular_ts), c(2, 1, 1),seasonal = list(order = c(0, 1, 0), period = 12))
+
+
+
+forecastAP <- forecast(fit2, level = c(95), h = 3)
+autoplot(forecastAP)
+
+```
+
+Podemos ver que en lo que es el combustible regular, a lo largo de los años ha tenido unos picos entre altos y bajos, pero tambien podemos ver que al igual que la gasolina superior, en el año 2021 aproximadamente, se vio un descenso, lo cual puede ser provocado por la pandemia, pero tambien podemos ver que para nuestra prediccion, se puede ver que este combustible ha ido disminuyendo, lo cual puede ser por multiples factores, pero podriamos decir que se debe debido a que el precio de este combustible ha elevado su precio, por lo cual ha sido menos demandado en la medida de lo posible. 
+
+
+
+
+## Combustible DIESEL:
+
+
+```{r}
+# Para el combustible Superior 
+diesel_ts <- ts( diesel$`Diesel`, start = c(2001,1),frequency = 12)
+
+# Inicio de la serie
+start(diesel_ts)
+#Final de la serie
+end(diesel_ts)
+#Frecuencia de la serie 
+frequency(diesel_ts)
+
+#Resultado en forma de grafica. 
+plot(diesel_ts)
+abline(reg=lm(diesel_ts~time(diesel_ts)), col=c("blue"))
+
+```
+
+
+Con esto, podemos ver el compartamiento que ha tenido el combustible diesel a lo largo de los años. 
+
+
+```{r}
+plot(aggregate(diesel_ts,FUN=mean))
+dec.Diesel<-decompose(diesel_ts)
+plot(dec.Diesel)
+```
+
+
+Como se observa en la grafica anterior, la serie tiene tendencia a aumentar asi como que tambien tiene estacionalidad y por ultimo, se puede ver que no es estacionaria en varianza, por eso debemos aplicarle una transformacion logaritmica. 
+
+
+```{r}
+train <- head(diesel_ts, round(length(diesel_ts) * 0.7))
+h <- length(diesel_ts) - length(train)
+test <- tail(diesel_ts, h)
+#Aplicaremos una transformación logarítmica
+Diesellog <- log(train)
+plot(decompose(train))
+```
+
+
+```{r}
+#Ver el gráfico de la serie
+plot(train)
+```
+
+Se observa con esta transformacion, se logro hacer constante en varianza, ahora podemos enfocarnos en su estacionalidad en la media, para eso haremos la prueba de raices...
+
+
+
+```{r}
+adfTest(train)
+unitrootTest(train)
+```
+
+
+El valor de P es mayor a 0.05, por lo que ahora veremos que pasa si le aplicamos una diferenciacion
+
+```{r}
+adfTest(diff(train))
+unitrootTest(diff(train))
+```
+
+
+Con el nuevo valor de P, que es menor a 0.5, podemos asumir que tenemos un valor D=1, por lo que ahora identificaremos el valor P y Q
+
+
+```{r}
+acf(Diesellog, 50)
+```
+
+
+Basandonos en la grafica, podemos asumir que el valor de Q sera igua la 2, ahora trataremos de identificar el valor de P.
+
+```{r}
+pacf(Diesellog, 50)
+```
+
+Igualmente, tomando en cuenta lo visto en la grafica, podemos pensar que el valor de P es igual a 2, es decir, trabajaremos con un modelo ARIMA de la siguiente manera: 
+
+P = 2
+Q = 2
+D = 1 
+
+
+Reiteraremos la prueba de estacionalidad en la serie
+
+```{r}
+traines <- decompose(train)
+plot(traines$seasonal)
+```
+
+
+Si contiene estacionalidad, le aplicaremos 36 resagos para identificar los picos
+
+
+```{R}
+Acf(diff(Diesellog),36)
+Pacf(diff(Diesellog),36)
+```
+
+
+
+Se puede notar un pico muy notable en 12, por lo cual, haremos que los parametros estacionales sean de la forma (1,1,0), por cual, el ARIMA es:
+```{r}
+fitArima<-arima(Diesellog, order = c(1,2,2), seasonal =c(1,1,0))
+fautoarima<-auto.arima(train)
+fautoarima
+```
+
+Para comprobar, haremos la validacion 
+
+```{r warning=FALSE}
+library(lmtest)
+coeftest(fitArima)
+```
+
+
+Ahora haremos el modelo generado por R, para comprobar los dos modelos. 
+
+```{r}
+coeftest(fautoarima)
+```
+
+
+
+
+## Prediccion 
+
+```{r}
+
+auto.arima(diesel_ts)
+
+
+fit <- arima(log(diesel_ts), c(0, 1, 1),seasonal = list(order = c(0, 1, 1), period = 12))
+pred <- predict(fit, n.ahead = 3)
+ts.plot(diesel_ts,2.718^pred$pred, log = "y", lty = c(1,3))
+
+
+
+fit2 <- arima(log(diesel_ts), c(2, 1, 1),seasonal = list(order = c(0, 1, 0), period = 12))
+
+
+
+forecastAP <- forecast(fit2, level = c(95), h = 3)
+autoplot(forecastAP)
+
+```
+
+Por ultimo, podemos ver que el combustible Diesel al igual que los demas combustibles, ha tenido altibajos, pero si cabe recalcar que en comparacion a los otros combustibles, la disminucion que tuvo durante a la pandemia fue mucho menor, lo cual es logico, porque aunque la movilidad estuviera restringida, lo que es el transporte pesado nunca paro, por lo cual tiene sentido que la demanda de diesel haya sido mucho mayor que sus dos competidores, asi como tambiem podemos ver, que segun nuestra prediccion, el diesel ira al alza, cosa que tambien es logico, debido a lo antes mencionado de su alta demanda y sin contar que el precio de este es mucho menor. 
+
+
+## Consumo 
+```{r}
+# Mes con el cual se tiene mayor consumo de Gasolina
+gas<-data_consumo[order(-data_consumo$`Gasolina superior`),]
+super<- head(gas,10)
+super<-super[,1:2]
+#Mes en el cual se tiene mayor consumo de Regular 
+reg<-data_consumo[order(-data_consumo$`Gasolina regular`),]
+regu<- head(reg,10)
+regu<-regu[,1:2]
+#Mes en el que se tiene mayor consumo de Diesel 
+diesel<-data_consumo[order(-data_consumo$Diesel),]
+dies<- head(diesel, 10)
+dies<-dies[,1:2]
+# Mes con el cual se tiene menor consumo de Gasolina
+gas1<-data_consumo[order(data_consumo$`Gasolina regular`),]
+menossuper<- head(gas1,10)
+menossuper<-menossuper[,1:2]
+#Mes en el cual se tiene menor consumo de Regular 
+reg1<-data_consumo[order(data_consumo$`Gasolina regular`),]
+menosregu_c<- head(reg1,10)
+menosregu_c<-menosregu[,1:2]
+#Mes en el que se tiene menor importacion de Diesel 
+diesel1<-data_consumo[order(data_consumo$Diesel),]
+menosdies<- head(diesel1, 10)
+menosdies<-menosdies[,1:2]
+def<-data.frame(Tipo=c("Gasolina","Regular","Diesel"), Media=c(mean(data_consumo$`Gasolina superior`), mean(data_consumo$`Gasolina regular`), mean(data_consumo$Diesel)))
+grafdef_c<-ggplot(data=def, aes(x=Tipo, y=Media, fill=Tipo)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_text(aes(label=as.integer(Media)), vjust=1.6, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  labs(title="Promedio de consumo por tipo de gasolina", y="Promedio")+
+  theme(legend.position="none")
+grafsup_c<-ggplot(data_consumo, aes(x = format(`Fecha`, format='%Y'), y = `Gasolina superior`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Consumo por año de combustible Superior", y="Consumo" , x='Año')+
+  theme(legend.position="none")
+grafreg_c<-ggplot(data_consumo, aes(x = format(`Fecha`, format='%Y'), y = `Gasolina regular`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Consumo por año de combustible Regular", y="Consumo" , x='Año')+
+  theme(legend.position="none")
+grafdie_c<-ggplot(data_consumo, aes(x = format(`Fecha`, format='%Y'), y = `Diesel`, fill =format(`Fecha`, format='%Y') )) +
+  geom_bar(stat = "identity",position=position_dodge())+labs(title="Consumo por año de combustible Diesel", y="Consumo" , x='Año')+
+  theme(legend.position="none")
+```
+
+Para el data_consumo se tienen los siguientes datos:
+```{r }
+data_consumo
+```
+
+De los cuales se puede obtener lo siguiente:
+```{r}
+str(data_consumo)
+```
+Todas las variables tratadas en el dataset son variables cuantitativas, por lo se presentara el histograma de cada una de las variables.
+
+```{r}
+hist(x= data_consumo$`Gasolina superior`, main = paste("Histograma de Gasolina Superior"))
+hist(x= data_consumo$`Gasolina regular`, main = paste("Histograma de gasolina regular"))
+hist(x= data_consumo$Diesel, main = paste("Histograma de gasolina diesel"))
+plot(data_consumo$Fecha, data_consumo$`Total Consumo`, main = paste("Total de Consumo"))
+```
+
+A continuación se puede ver que cuales han sido las fehas en las que se encuentra un mayor consumo por cada uno de los tipos de gasolina
+
+Para el combustible superior:
+```{r}
+super
+```
+Para el combustible regular
+```{r}
+regu
+```
+Para el combustible diesel
+```{r}
+dies
+```
+
+Ademas se pueden ver cuales fueron las fechas en las que se obsvera una cantidad menor de cosumo de cada uno de los tipos de gasolina.
+
+```{r}
+menossuper
+```
+Para el combustible regular
+```{r}
+menosregu_c
+```
+
+Para el cumbistible de diesel
+```{r}
+menosdies
+```
+Graficas
+```{r}
+grafdef_c
+```
+Se puede observar que la gasolina Diesel se vio mas en el consumo.
+```{r}
+grafsup_c
+```
+Se puede observar que el año que demuestra mas consumo es entre los años 2020 y 2021.
+
+```{r}
+grafreg_c
+```
+Se observa que el año 2021 se ve afectado en el consumo de la gasolina regular.
+
+```{r}
+grafdie_c
+```
+Al igual en el combustible de Diesel el año que se vio afectado por el conusmo fue en el año 2021.
